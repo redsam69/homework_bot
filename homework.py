@@ -44,7 +44,7 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Получение данных от сервера."""
-    logging.debug("Получение ответа от сервера")
+    logging.debug('Получение ответа от сервера')
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
@@ -62,33 +62,43 @@ def get_api_answer(current_timestamp):
     except ValueError:
         logger.error('Ответ сервера не в json ', exc_info=True)
         return {}
-    logging.debug("Получен ответ от сервера")
+    logging.debug('Получен ответ от сервера')
     return py_request
 
 
 def check_response(response):
     """Проверка информации."""
-    logging.debug("Проверка ответа API на корректность")
+    logging.debug('Проверка ответа API на корректность')
     if not isinstance(response, dict):
         raise TypeError('Ошибка homeworks не dict')
-    if response['homeworks'] is None:
-        raise TypeError("Задания не обнаружены")
     if not isinstance(response['homeworks'], list):
-        raise Exception("response['homeworks'] не является списком")
-    logging.debug("API проверен на корректность")
+        raise Exception('response["homeworks"] не является списком')
+    if 'homeworks' not in response:
+        raise KeyError(
+            'Отсутствует ключ homeworks в response'
+        )
     if len(response['homeworks']) == 0:
         logger.debug('Нет новых заданий')
-    logging.debug("API проверен на корректность")
+        raise ValueError('Нет новых заданий')
+    logging.debug('API проверен на корректность')
     return response['homeworks']
 
 
 def parse_status(homework):
     """Обрабока домашней работы."""
+    if 'homework_name' not in homework:
+        raise KeyError(
+            'Отсутствует ключ homework_name в homework'
+        )
     homework_name = homework.get('homework_name')
+    if 'status' not in homework:
+        raise KeyError(
+            'Отсутствует ключ status в homework'
+        )
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_STATUSES:
         raise KeyError(
-            "Обнаружен новый статус, отсутствующий в списке!"
+            'Обнаружен новый статус, отсутствующий в списке!'
         )
     verdict = HOMEWORK_STATUSES.get(homework_status)
     logger.info(f'Вердикт проекта {verdict}')
@@ -124,12 +134,11 @@ def main():
             if check_response_result:
                 parse_status_update = parse_status(check_response_result[0])
                 send_message(bot, parse_status_update)
-                print(parse_status_update)
             current_timestamp = response.get('current_date', current_timestamp)
             time.sleep(TELEGRAM_RETRY_TIME)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logger.error(message, exc_info=True)
+            logger.exception(message, exc_info=True)
             if str(error) != str(error_temp):
                 error_temp = error
                 send_message(bot, message)
